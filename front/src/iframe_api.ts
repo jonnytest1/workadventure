@@ -10,6 +10,7 @@ import {OpenTabEvent} from "./Api/Events/OpenTabEvent";
 import {GoToPageEvent} from "./Api/Events/GoToPageEvent";
 import {OpenCoWebSiteEvent} from "./Api/Events/OpenCoWebSiteEvent";
 import { LoadPageEvent } from './Api/Events/LoadPageEvent';
+import { GameStateEvent, isGameStateEvent } from './Api/Events/ApiGameStateEvent';
 
 interface WorkAdventureApi {
     sendChatMessage(message: string, author: string): void;
@@ -26,6 +27,7 @@ interface WorkAdventureApi {
     restorePlayerControl() : void;
     displayBubble() : void;
     removeBubble() : void;
+    getGameState():Promise<unknown>
 }
 
 declare global {
@@ -76,7 +78,23 @@ class Popup {
     }
 }
 
+
+const stateResolvers:Array<(event:GameStateEvent)=>void> =[]
+
 window.WA = {
+
+
+
+    getGameState(){
+        return new Promise<GameStateEvent>((resolver,thrower)=>{
+            stateResolvers.push(resolver);
+            window.parent.postMessage({ 
+                type:"getState"
+            },"*")
+        })
+    },
+
+
     /**
      * Send a message in the chat.
      * Only the local user will receive this message.
@@ -235,6 +253,10 @@ window.addEventListener('message', message => {
             if (callback) {
                 callback(popup);
             }
+        }else if(payload.type=="gameState" && isGameStateEvent(payloadData)){
+            stateResolvers.forEach(resolver=>{
+                resolver(payloadData);
+            })
         }
 
     }

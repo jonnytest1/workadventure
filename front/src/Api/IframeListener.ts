@@ -13,6 +13,8 @@ import {scriptUtils} from "./ScriptUtils";
 import {GoToPageEvent, isGoToPageEvent} from "./Events/GoToPageEvent";
 import {isOpenCoWebsite, OpenCoWebSiteEvent} from "./Events/OpenCoWebSiteEvent";
 import { isLoadPageEvent } from './Events/LoadPageEvent';
+import { GameStateEvent } from './Events/ApiGameStateEvent';
+import { deepFreezeClone as deepFreezeClone } from '../utility';
 
 
 /**
@@ -56,6 +58,10 @@ class IframeListener {
 
     private readonly _removeBubbleStream: Subject<void> = new Subject();
     public readonly removeBubbleStream = this._removeBubbleStream.asObservable();
+
+    
+    private readonly _gameStateStream: Subject<void> = new Subject();
+    public readonly gameStateStream = this._gameStateStream.asObservable();
 
     private readonly iframes = new Set<HTMLIFrameElement>();
     private readonly scripts = new Map<string, HTMLIFrameElement>();
@@ -110,12 +116,22 @@ class IframeListener {
                     this._removeBubbleStream.next();
                 }else if (payload.type === 'loadPage' && isLoadPageEvent(payload.data)){
                     this._loadPageStream.next(payload.data.url);
+                }else if(payload.type=="getState"){
+                    this._gameStateStream.next();
                 }
             }
 
 
         }, false);
 
+    }
+
+    
+    sendFrozenGameStateEvent(gameStateEvent: GameStateEvent) {
+        this.postMessage({
+            'type': 'gameState',
+            'data': deepFreezeClone(gameStateEvent) 
+        });
     }
 
     /**
