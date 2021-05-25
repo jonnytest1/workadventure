@@ -18,6 +18,7 @@ class GameSceneIframeListeners {
         iframeSubscriptionList.push(iframeListener.triggerMessageEvent.subscribe(message => {
             layoutManager.addActionButton(message.uuid, message.message, () => {
                 iframeListener.sendMessageTriggeredEvent(message.uuid)
+                layoutManager.removeActionButton(message.uuid, gameScene.userInputManager);
             }, gameScene.userInputManager);
         }))
 
