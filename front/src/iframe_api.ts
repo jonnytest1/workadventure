@@ -355,7 +355,9 @@ window.addEventListener('message', message => {
                 callbacks[moveEventUuid]?.(movedEvnt)
             }
         } else if (payload.type == "listenersRegistered") {
-            (callbacks["onload"] as () => void)();
+            if (callbacks["onload"]) {
+                (callbacks["onload"] as () => void)();
+            }
         }
     }
 
