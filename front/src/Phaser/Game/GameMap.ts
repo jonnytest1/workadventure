@@ -1,5 +1,6 @@
-import {ITiledMap, ITiledMapLayer} from "../Map/ITiledMap";
-import {LayersIterator} from "../Map/LayersIterator";
+import { CustomVector, Vector2 } from '../../utility/vector';
+import type { ITiledMap } from "../Map/ITiledMap";
+import { LayersIterator } from "../Map/LayersIterator";
 
 export type PropertyChangeCallback = (newValue: string | number | boolean | undefined, oldValue: string | number | boolean | undefined, allProps: Map<string, string | boolean | number>) => void;
 
@@ -8,8 +9,8 @@ export type PropertyChangeCallback = (newValue: string | number | boolean | unde
  * It is used to handle layer properties.
  */
 export class GameMap {
-    private key: number|undefined;
-    private lastProperties = new Map<string, string|boolean|number>();
+    private key: number | undefined;
+    private lastProperties = new Map<string, string | boolean | number>();
     private callbacks = new Map<string, Array<PropertyChangeCallback>>();
     public readonly layersIterator: LayersIterator;
 
@@ -30,7 +31,7 @@ export class GameMap {
         }
         this.key = key;
 
-        const newProps = this.getProperties(key);
+        const newProps = this.getProperties(key, { x, y });
         const oldProps = this.lastProperties;
         this.lastProperties = newProps;
 
@@ -51,20 +52,44 @@ export class GameMap {
         }
     }
 
-    public getCurrentProperties(): Map<string, string|boolean|number> {
+    public getCurrentProperties(): Map<string, string | boolean | number> {
         return this.lastProperties;
     }
 
-    private getProperties(key: number): Map<string, string|boolean|number> {
-        const properties = new Map<string, string|boolean|number>();
+    private getProperties(key: number, position: CustomVector): Map<string, string | boolean | number> {
+        const properties = new Map<string, string | boolean | number>();
+
+        const currentIndexPosition = new Vector2(position)
+            .div(new Vector2(this.map.tilewidth, this.map.tileheight))
+            .floor()
+
 
         for (const layer of this.layersIterator) {
             if (layer.type !== 'tilelayer') {
                 continue;
             }
-            const tiles = layer.data as number[];
-            if (tiles[key] == 0) {
-                continue;
+
+            if (layer.chunks) {
+
+                const currentChunk = layer.chunks.find(chunk => {
+                    return chunk.x < currentIndexPosition.x && chunk.x + chunk.width + 1 > currentIndexPosition.x
+                        && chunk.y < currentIndexPosition.y && chunk.y + chunk.height + 1 > currentIndexPosition.y
+                })
+                if (currentChunk && layer.startx !== undefined && layer.starty !== undefined) {
+                    const chunkPosition = currentIndexPosition
+                        .sub(new Vector2({ x: currentChunk.x, y: currentChunk.y }))
+                    const chunkIndex = chunkPosition.y * currentChunk.width + chunkPosition.x
+
+                    if (currentChunk.data[chunkIndex] == 0) {
+                        continue;
+                    }
+                }
+
+            } else if (layer.data) {
+                const tiles = layer.data as number[];
+                if (tiles[key] == 0) {
+                    continue;
+                }
             }
             // There is a tile in this layer, let's embed the properties
             if (layer.properties !== undefined) {

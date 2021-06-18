@@ -91,6 +91,8 @@ import { joystickBaseImg, joystickBaseKey, joystickThumbImg, joystickThumbKey } 
 import { MenuScene, MenuSceneName } from '../Menu/MenuScene';
 import { HasMovedEvent } from '../../Api/Events/HasMovedEvent';
 import { gameSceneIframeListeners } from './GameSceneIframeListener';
+import { Vector } from 'matter';
+import { Vector2 } from '../../utility/vector';
 
 export interface GameSceneInitInterface {
     initPosition: PointInterface | null,
@@ -947,15 +949,34 @@ export class GameScene extends ResizableScene implements CenterListener {
             throw new Error('The content of a JSON map must be filled as a JSON array, not as a string');
         }
         const possibleStartPositions: PositionInterface[] = [];
-        tiles.forEach((objectKey: number, key: number) => {
-            if (objectKey === 0) {
-                return;
-            }
-            const y = Math.floor(key / layer.width);
-            const x = key % layer.width;
 
-            possibleStartPositions.push({ x: x * this.mapFile.tilewidth, y: y * this.mapFile.tilewidth });
-        });
+        if (layer.chunks) {
+            layer.chunks.forEach(chunk => {
+                chunk.data.forEach((objectKey: number, key: number) => {
+                    if (objectKey === 0) {
+                        return;
+                    }
+                    const y = Math.floor(key / chunk.width);
+                    const x = key % chunk.width;
+
+                    const layerStart = new Vector2(chunk)
+                    const tilePosition = layerStart.add(new Vector2(x, y))
+                    possibleStartPositions.push(tilePosition.mult(this.mapFile.tilewidth));
+                });
+            })
+        } else if (tiles) {
+            tiles.forEach((objectKey: number, key: number) => {
+                if (objectKey === 0) {
+                    return;
+                }
+                const y = Math.floor(key / layer.width);
+                const x = key % layer.width;
+
+                possibleStartPositions.push({ x: x * this.mapFile.tilewidth, y: y * this.mapFile.tilewidth });
+            });
+        }
+
+
         // Get a value at random amongst allowed values
         if (possibleStartPositions.length === 0) {
             console.warn('The start layer "' + layer.name + '" for this map is empty.');

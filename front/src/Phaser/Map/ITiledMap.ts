@@ -61,9 +61,20 @@ export interface ITiledMapGroupLayer {
     layers: ITiledMapLayer[];
 }
 
+export interface Chunk {
+    data: number[]
+    height: number
+    width: number
+    x: number
+    y: number
+
+}
+
 export interface ITiledMapTileLayer {
     id?: number,
-    data: number[] | string;
+    data?: number[] | string;
+
+    chunks?: Array<Chunk>
     height: number;
     name: string;
     opacity: number;
@@ -76,6 +87,10 @@ export interface ITiledMapTileLayer {
     width: number;
     x: number;
     y: number;
+
+
+    startx?: number
+    starty?: number
 
     /**
      * Draw order (topdown (default), index)
