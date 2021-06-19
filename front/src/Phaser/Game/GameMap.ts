@@ -1,5 +1,5 @@
 import { CustomVector, Vector2 } from '../../utility/vector';
-import type { ITiledMap } from "../Map/ITiledMap";
+import type { ITiledMap, ITiledMapLayerProperty } from "../Map/ITiledMap";
 import { LayersIterator } from "../Map/LayersIterator";
 
 export type PropertyChangeCallback = (newValue: string | number | boolean | undefined, oldValue: string | number | boolean | undefined, allProps: Map<string, string | boolean | number>) => void;
@@ -12,11 +12,36 @@ export class GameMap {
     private key: number | undefined;
     private lastProperties = new Map<string, string | boolean | number>();
     private callbacks = new Map<string, Array<PropertyChangeCallback>>();
+
+    /**
+     * tileset.firstgid => (Map<tileid,Array<ITiledMapLayerProperty>>)
+     */
+    private tileSetPropertyMap = new Map<number, Map<number, Array<ITiledMapLayerProperty>>>()
     public readonly layersIterator: LayersIterator;
+
+    public exitUrls: Array<string> = []
 
     public constructor(private map: ITiledMap) {
         this.layersIterator = new LayersIterator(map);
+
+        for (const tileset of map.tilesets) {
+            if (!this.tileSetPropertyMap.has(tileset.firstgid)) {
+                this.tileSetPropertyMap.set(tileset.firstgid, new Map())
+            }
+            tileset?.tiles?.forEach(tile => {
+                if (tile.properties) {
+                    this.tileSetPropertyMap.get(tileset.firstgid)?.set(tile.id, tile.properties)
+                    tile.properties.forEach(prop => {
+                        if (prop.name == "exitUrl" && typeof prop.value == "string") {
+                            this.exitUrls.push(prop.value);
+                        }
+                    })
+                }
+            })
+        }
     }
+
+
 
     /**
      * Sets the position of the current player (in pixels)
@@ -65,6 +90,8 @@ export class GameMap {
 
 
         for (const layer of this.layersIterator) {
+
+            let tileIndex: number | undefined = undefined;
             if (layer.type !== 'tilelayer') {
                 continue;
             }
@@ -83,6 +110,7 @@ export class GameMap {
                     if (currentChunk.data[chunkIndex] == 0) {
                         continue;
                     }
+                    tileIndex = currentChunk.data[chunkIndex]
                 }
 
             } else if (layer.data) {
@@ -90,6 +118,7 @@ export class GameMap {
                 if (tiles[key] == 0) {
                     continue;
                 }
+                tileIndex = tiles[key]
             }
             // There is a tile in this layer, let's embed the properties
             if (layer.properties !== undefined) {
@@ -99,6 +128,23 @@ export class GameMap {
                     }
                     properties.set(layerProperty.name, layerProperty.value);
                 }
+            }
+
+            if (tileIndex) {
+                const tileset = this.map.tilesets.find(tileset => tileset.firstgid + tileset.tilecount > (tileIndex as number))
+                if (tileset) {
+                    const tileProperties = this.tileSetPropertyMap.get(tileset?.firstgid)?.get(tileIndex - tileset.firstgid)
+                    if (tileProperties) {
+                        for (const property of tileProperties) {
+                            if (property.value) {
+                                properties.set(property.name, property.value)
+                            } else if (properties.has(property.name)) {
+                                properties.delete(property.name)
+                            }
+                        }
+                    }
+                }
+
             }
         }
 
