@@ -122,7 +122,6 @@ export class GameMap {
                     continue;
                 }
                 tileIndex = tiles[key]
-                tileIndex = tiles[key]
             }
             // There is a tile in this layer, let's embed the properties
             if (layer.properties !== undefined) {
