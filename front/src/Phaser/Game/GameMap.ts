@@ -90,11 +90,11 @@ export class GameMap {
 
 
         for (const layer of this.layersIterator) {
-
-            let tileIndex: number | undefined = undefined;
             if (layer.type !== 'tilelayer') {
                 continue;
             }
+
+            let tileIndex: number | undefined = undefined;
 
             if (layer.chunks) {
 
@@ -120,6 +120,7 @@ export class GameMap {
                 }
                 tileIndex = tiles[key]
             }
+
             // There is a tile in this layer, let's embed the properties
             if (layer.properties !== undefined) {
                 for (const layerProperty of layer.properties) {
@@ -134,15 +135,13 @@ export class GameMap {
                 const tileset = this.map.tilesets.find(tileset => tileset.firstgid + tileset.tilecount > (tileIndex as number))
                 if (tileset) {
                     const tileProperties = this.tileSetPropertyMap[tileset?.firstgid][tileIndex - tileset.firstgid]
-                    if (tileProperties) {
-                        for (const property of tileProperties) {
-                            if (property.value) {
-                                properties.set(property.name, property.value)
-                            } else if (properties.has(property.name)) {
-                                properties.delete(property.name)
-                            }
+                    tileProperties?.forEach(property => {
+                        if (property.value) {
+                            properties.set(property.name, property.value)
+                        } else if (properties.has(property.name)) {
+                            properties.delete(property.name)
                         }
-                    }
+                    })
                 }
 
             }
