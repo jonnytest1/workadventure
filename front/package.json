@@ -40,9 +40,11 @@
     "webpack-require-http": "^0.4.3"
   },
   "scripts": {
-    "start": "webpack-dev-server -d --open",
+    "start": "run-p templater serve",
     "build": "webpack --config webpack.prod.js",
+    "templater": "cross-env ./templater.sh",
     "test": "ts-node node_modules/jasmine/bin/jasmine --config=jasmine.json",
+    "serve": "cross-env TS_NODE_PROJECT=\"tsconfig-for-webpack.json\" webpack serve --open",
     "lint": "node_modules/.bin/eslint src/ . --ext .ts",
     "fix": "node_modules/.bin/eslint --fix src/ . --ext .ts"
   }
