@@ -1,9 +1,6 @@
 import { CustomVector, Vector2 } from '../../utility/vector';
 import type { ITiledMap, ITiledMapLayerProperty } from "../Map/ITiledMap";
 import { LayersIterator } from "../Map/LayersIterator";
-import { CustomVector, Vector2 } from '../../utility/vector';
-import type { ITiledMap, ITiledMapLayerProperty } from "../Map/ITiledMap";
-import { LayersIterator } from "../Map/LayersIterator";
 
 export type PropertyChangeCallback = (newValue: string | number | boolean | undefined, oldValue: string | number | boolean | undefined, allProps: Map<string, string | boolean | number>) => void;
 
