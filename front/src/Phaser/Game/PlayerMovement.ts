@@ -1,3 +1,6 @@
+import type {HasMovedEvent} from "./GameManager";
+import {MAX_EXTRAPOLATION_TIME} from "../../Enum/EnvironmentVariable";
+import type {PositionInterface} from "../../Connexion/ConnexionModels";
 
 import { MAX_EXTRAPOLATION_TIME } from "../../Enum/EnvironmentVariable";
 import { PositionInterface } from "../../Connexion/ConnexionModels";

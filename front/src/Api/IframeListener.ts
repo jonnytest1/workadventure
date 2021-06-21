@@ -1,25 +1,29 @@
-import * as crypto from "crypto";
-import { Subject } from "rxjs";
+
 import { deepFreezeClone as deepFreezeClone } from '../utility';
-import { HtmlUtils } from "../WebRtc/HtmlUtils";
-import { GameStateEvent } from './Events/ApiGameStateEvent';
+import type { GameStateEvent } from './Events/ApiGameStateEvent';
 import { isUpdateTileEvent, UpdateTileEvent } from './Events/ApiUpdateTileEvent';
-import { ButtonClickedEvent } from "./Events/ButtonClickedEvent";
+
+import { Subject } from "rxjs";
 import { ChatEvent, isChatEvent } from "./Events/ChatEvent";
+import { HtmlUtils } from "../WebRtc/HtmlUtils";
+import type { EnterLeaveEvent } from "./Events/EnterLeaveEvent";
+import type { ButtonClickedEvent } from "./Events/ButtonClickedEvent";
 import { ClosePopupEvent, isClosePopupEvent } from "./Events/ClosePopupEvent";
-import { EnterLeaveEvent } from "./Events/EnterLeaveEvent";
 import { GoToPageEvent, isGoToPageEvent } from "./Events/GoToPageEvent";
 import { IframeEventMap, IframeEvent, IframeResponseEvent, IframeResponseEventMap, isIframeEventWrapper, TypedMessageEvent } from "./Events/IframeEvent";
+import type { UserInputChatEvent } from "./Events/UserInputChatEvent";
 import { isLoadPageEvent } from './Events/LoadPageEvent';
-import { MenuItemClickedEvent } from './Events/MenuItemClickedEvent';
+import type { MenuItemClickedEvent } from './Events/MenuItemClickedEvent';
 import { isMenuItemRegisterEvent } from './Events/MenuItemRegisterEvent';
 import { isOpenCoWebsite, OpenCoWebSiteEvent } from "./Events/OpenCoWebSiteEvent";
+import { isPlaySoundEvent, PlaySoundEvent } from "./Events/PlaySoundEvent";
+import { isStopSoundEvent, StopSoundEvent } from "./Events/StopSoundEvent";
+import { isLoadSoundEvent, LoadSoundEvent } from "./Events/LoadSoundEvent";
 import { isOpenPopupEvent, OpenPopupEvent } from "./Events/OpenPopupEvent";
 import { isOpenTabEvent, OpenTabEvent } from "./Events/OpenTabEvent";
 import { isMessageReferenceEvent, isTriggerMessageEvent, MessageReferenceEvent, TriggerMessageEvent } from './Events/TriggerMessageEvent';
-import { UserInputChatEvent } from "./Events/UserInputChatEvent";
 import { scriptUtils } from "./ScriptUtils";
-import { HasMovedEvent } from './Events/HasMovedEvent';
+import type { HasMovedEvent } from './Events/HasMovedEvent';
 
 /**
  * Listens to messages from iframes and turn those messages into easy to use observables.
@@ -80,6 +84,15 @@ class IframeListener {
     private readonly _removeTriggerMessageEvent: Subject<MessageReferenceEvent> = new Subject();
     public readonly removeTriggerMessageEvent = this._removeTriggerMessageEvent.asObservable();
 
+    private readonly _playSoundStream: Subject<PlaySoundEvent> = new Subject();
+    public readonly playSoundStream = this._playSoundStream.asObservable();
+
+    private readonly _stopSoundStream: Subject<StopSoundEvent> = new Subject();
+    public readonly stopSoundStream = this._stopSoundStream.asObservable();
+
+    private readonly _loadSoundStream: Subject<LoadSoundEvent> = new Subject();
+    public readonly loadSoundStream = this._loadSoundStream.asObservable();
+
     private readonly iframes = new Set<HTMLIFrameElement>();
     private readonly scripts = new Map<string, HTMLIFrameElement>();
     private sendMoveEvents: boolean = false;
@@ -97,6 +110,10 @@ class IframeListener {
                 if (iframe.contentWindow === message.source) {
                     foundSrc = iframe.src;
                     break;
+                }
+
+                if (foundSrc === undefined) {
+                    return;
                 }
             }
             if (!foundSrc) {
@@ -118,11 +135,19 @@ class IframeListener {
                 else if (payload.type === 'goToPage' && isGoToPageEvent(payload.data)) {
                     scriptUtils.goToPage(payload.data.url);
                 }
+                else if (payload.type === 'playSound' && isPlaySoundEvent(payload.data)) {
+                    this._playSoundStream.next(payload.data);
+                }
+                else if (payload.type === 'stopSound' && isStopSoundEvent(payload.data)) {
+                    this._stopSoundStream.next(payload.data);
+                }
+                else if (payload.type === 'loadSound' && isLoadSoundEvent(payload.data)) {
+                    this._loadSoundStream.next(payload.data);
+                }
                 else if (payload.type === 'openCoWebSite' && isOpenCoWebsite(payload.data)) {
                     const scriptUrl = [...this.scripts.keys()].find(key => {
                         return this.scripts.get(key)?.contentWindow == message.source
                     })
-
                     scriptUtils.openCoWebsite(payload.data.url, scriptUrl || foundSrc, message.source, payload.data.options);
                 }
                 else if (payload.type === 'closeCoWebSite') {
@@ -234,7 +259,7 @@ class IframeListener {
     }
 
     private getIFrameId(scriptUrl: string): string {
-        return 'script' + crypto.createHash('md5').update(scriptUrl).digest("hex");
+        return 'script' + btoa(scriptUrl);
     }
 
     unregisterScript(scriptUrl: string): void {

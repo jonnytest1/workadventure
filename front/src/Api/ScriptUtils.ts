@@ -49,6 +49,7 @@ class ScriptUtils {
 
             }
         }
+           coWebsiteManager.loadCoWebsite(url, base);
     }
 
     public closeCoWebSite() {

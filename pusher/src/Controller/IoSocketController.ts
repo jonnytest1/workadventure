@@ -1,5 +1,5 @@
 import {CharacterLayer, ExSocketInterface} from "../Model/Websocket/ExSocketInterface"; //TODO fix import by "_Model/.."
-import {GameRoomPolicyTypes, PusherRoom} from "../Model/PusherRoom";
+import {GameRoomPolicyTypes} from "../Model/PusherRoom";
 import {PointInterface} from "../Model/Websocket/PointInterface";
 import {
     SetPlayerDetailsMessage,
@@ -12,7 +12,11 @@ import {
     WebRtcSignalToServerMessage,
     PlayGlobalMessage,
     ReportPlayerMessage,
-    QueryJitsiJwtMessage, SendUserMessage, ServerToClientMessage, CompanionMessage
+    QueryJitsiJwtMessage,
+    SendUserMessage,
+    ServerToClientMessage,
+    CompanionMessage,
+    EmotePromptMessage,
 } from "../Messages/generated/messages_pb";
 import {UserMovesMessage} from "../Messages/generated/messages_pb";
 import {TemplatedApp} from "uWebSockets.js"
@@ -20,7 +24,7 @@ import {parse} from "query-string";
 import {jwtTokenManager} from "../Services/JWTTokenManager";
 import {adminApi, CharacterTexture, FetchMemberDataByUuidResponse} from "../Services/AdminApi";
 import {SocketManager, socketManager} from "../Services/SocketManager";
-import {emitError, emitInBatch} from "../Services/IoSocketHelpers";
+import {emitInBatch} from "../Services/IoSocketHelpers";
 import {ADMIN_API_TOKEN, ADMIN_API_URL, SOCKET_IDLE_TIMER} from "../Enum/EnvironmentVariable";
 import {Zone} from "_Model/Zone";
 import {ExAdminSocketInterface} from "_Model/Websocket/ExAdminSocketInterface";
@@ -117,15 +121,15 @@ export class IoSocketController {
                         upgradeAborted.aborted = true;
                     });
 
-                    try {
-                        const url = req.getUrl();
-                        const query = parse(req.getQuery());
-                        const websocketKey = req.getHeader('sec-websocket-key');
-                        const websocketProtocol = req.getHeader('sec-websocket-protocol');
-                        const websocketExtensions = req.getHeader('sec-websocket-extensions');
-                        const IPAddress = req.getHeader('x-forwarded-for');
+                    const url = req.getUrl();
+                    const query = parse(req.getQuery());
+                    const websocketKey = req.getHeader('sec-websocket-key');
+                    const websocketProtocol = req.getHeader('sec-websocket-protocol');
+                    const websocketExtensions = req.getHeader('sec-websocket-extensions');
+                    const IPAddress = req.getHeader('x-forwarded-for');
 
-                        const roomId = query.roomId;
+                    const roomId = query.roomId;
+                    try {
                         if (typeof roomId !== 'string') {
                             throw new Error('Undefined room ID: ');
                         }
@@ -163,6 +167,7 @@ export class IoSocketController {
                         const userUuid = await jwtTokenManager.getUserUuidFromToken(token, IPAddress, roomId);
 
                         let memberTags: string[] = [];
+                        let memberVisitCardUrl: string|null = null;
                         let memberMessages: unknown;
                         let memberTextures: CharacterTexture[] = [];
                         const room = await socketManager.getOrCreateRoom(roomId);
@@ -171,6 +176,7 @@ export class IoSocketController {
                                 let userData : FetchMemberDataByUuidResponse = {
                                     uuid: v4(),
                                     tags: [],
+                                    visitCardUrl: null,
                                     textures: [],
                                     messages: [],
                                     anonymous: true
@@ -182,32 +188,34 @@ export class IoSocketController {
                                         // If we get an HTTP 404, the token is invalid. Let's perform an anonymous login!
                                         console.warn('Cannot find user with uuid "'+userUuid+'". Performing an anonymous login instead.');
                                     } else if(err?.response?.status == 403) {
-                                        // If we get an HTTP 404, the world is full. We need to broadcast a special error to the client.
-                                        // we finish immediatly the upgrade then we will close the socket as soon as it starts opening. 
-                                        res.upgrade({
+                                        // If we get an HTTP 403, the world is full. We need to broadcast a special error to the client.
+                                        // we finish immediately the upgrade then we will close the socket as soon as it starts opening.
+                                        return res.upgrade({
                                             rejected: true,
+                                            message: err?.response?.data.message,
+                                            status: err?.response?.status
                                         }, websocketKey,
                                         websocketProtocol,
                                         websocketExtensions,
                                         context);
-                                        return;
                                     }else{
                                         throw err;
                                     }
                                 }
                                 memberMessages = userData.messages;
                                 memberTags = userData.tags;
+                                memberVisitCardUrl = userData.visitCardUrl;
                                 memberTextures = userData.textures;
                                 if (!room.public && room.policyType === GameRoomPolicyTypes.USE_TAGS_POLICY && (userData.anonymous === true || !room.canAccess(memberTags))) {
-                                    throw new Error('No correct tags')
+                                    throw new Error('Insufficient privileges to access this room')
                                 }
                                 if (!room.public && room.policyType === GameRoomPolicyTypes.MEMBERS_ONLY_POLICY && userData.anonymous === true) {
-                                    throw new Error('No correct member')
+                                    throw new Error('Use the login URL to connect')
                                 }
                             } catch (e) {
                                 console.log('access not granted for user '+userUuid+' and room '+roomId);
                                 console.error(e);
-                                throw new Error('Client cannot acces this ressource.')
+                                throw new Error('User cannot access this world')
                             }
                         }
 
@@ -233,6 +241,7 @@ export class IoSocketController {
                                 characterLayers: characterLayerObjs,
                                 messages: memberMessages,
                                 tags: memberTags,
+                                visitCardUrl: memberVisitCardUrl,
                                 textures: memberTextures,
                                 position: {
                                     x: x,
@@ -254,23 +263,35 @@ export class IoSocketController {
                             context);
 
                     } catch (e) {
-                        if (e instanceof Error) {
+                        /*if (e instanceof Error) {
                             console.log(e.message);
                             res.writeStatus("401 Unauthorized").end(e.message);
                         } else {
                             res.writeStatus("500 Internal Server Error").end('An error occurred');
-                        }
-                        return;
+                        }*/
+                        return res.upgrade({
+                            rejected: true,
+                            message: e.message ? e.message : '500 Internal Server Error'
+                        }, websocketKey,
+                        websocketProtocol,
+                        websocketExtensions,
+                        context);
                     }
                 })();
             },
             /* Handlers */
             open: (ws) => {
                 if(ws.rejected === true) {
-                    socketManager.emitWorldFullMessage(ws);
+                    //FIX ME to use status code
+                    if(ws.message === 'World is full'){
+                        socketManager.emitWorldFullMessage(ws);
+                    }else{
+                        socketManager.emitConnexionErrorMessage(ws, ws.message as string);
+                    }
                     ws.close();
+                    return;
                 }
-                
+
                 // Let's join the room
                 const client = this.initClient(ws);
                 socketManager.handleJoinRoom(client);
@@ -317,6 +338,8 @@ export class IoSocketController {
                     socketManager.handleReportMessage(client, message.getReportplayermessage() as ReportPlayerMessage);
                 } else if (message.hasQueryjitsijwtmessage()){
                     socketManager.handleQueryJitsiJwtMessage(client, message.getQueryjitsijwtmessage() as QueryJitsiJwtMessage);
+                } else if (message.hasEmotepromptmessage()){
+                    socketManager.handleEmotePromptMessage(client, message.getEmotepromptmessage() as EmotePromptMessage);
                 }
 
                     /* Ok is false if backpressure was built up, wait for drain */
@@ -357,6 +380,7 @@ export class IoSocketController {
         client.messages = ws.messages;
         client.name = ws.name;
         client.tags = ws.tags;
+        client.visitCardUrl = ws.visitCardUrl;
         client.textures = ws.textures;
         client.characterLayers = ws.characterLayers;
         client.companion = ws.companion;

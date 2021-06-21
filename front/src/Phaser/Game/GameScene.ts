@@ -1,5 +1,5 @@
 import { gameManager } from "./GameManager";
-import {
+import type {
     GroupCreatedUpdatedMessageInterface,
     MessageUserJoined,
     MessageUserMovedInterface,
@@ -9,25 +9,22 @@ import {
     PositionInterface,
     RoomJoinedMessageInterface
 } from "../../Connexion/ConnexionModels";
-import { CurrentGamerInterface, hasMovedEventName, Player } from "../Player/Player";
+import { hasMovedEventName, Player, requestEmoteEventName } from "../Player/Player";
 import {
     DEBUG_MODE,
     JITSI_PRIVATE_MODE,
     MAX_PER_GROUP,
     POSITION_DELAY,
-    RESOLUTION,
-    ZOOM_LEVEL
 } from "../../Enum/EnvironmentVariable";
-import {
+import type {
     ITiledMap,
     ITiledMapLayer,
     ITiledMapLayerProperty,
     ITiledMapObject,
-    ITiledText,
     ITiledMapTileLayer,
     ITiledTileSet
 } from "../Map/ITiledMap";
-import { AddPlayerInterface } from "./AddPlayerInterface";
+import type { AddPlayerInterface } from "./AddPlayerInterface";
 import { PlayerAnimationDirections } from "../Player/Animation";
 import { PlayerMovement } from "./PlayerMovement";
 import { PlayersPositionInterpolator } from "./PlayersPositionInterpolator";
@@ -51,13 +48,14 @@ import {
 import { GameMap } from "./GameMap";
 import { coWebsiteManager } from "../../WebRtc/CoWebsiteManager";
 import { mediaManager } from "../../WebRtc/MediaManager";
-import { ItemFactoryInterface } from "../Items/ItemFactoryInterface";
-import { ActionableItem } from "../Items/ActionableItem";
+import type { ItemFactoryInterface } from "../Items/ItemFactoryInterface";
+import type { ActionableItem } from "../Items/ActionableItem";
 import { UserInputManager } from "../UserInput/UserInputManager";
-import { UserMovedMessage } from "../../Messages/generated/messages_pb";
+import { soundManager } from "./SoundManager";
+import type { UserMovedMessage } from "../../Messages/generated/messages_pb";
 import { ProtobufClientUtils } from "../../Network/ProtobufClientUtils";
 import { connectionManager } from "../../Connexion/ConnectionManager";
-import { RoomConnection } from "../../Connexion/RoomConnection";
+import type { RoomConnection } from "../../Connexion/RoomConnection";
 import { GlobalMessageManager } from "../../Administration/GlobalMessageManager";
 import { userMessageManager } from "../../Administration/UserMessageManager";
 import { ConsoleGlobalMessageManager } from "../../Administration/ConsoleGlobalMessageManager";
@@ -75,23 +73,31 @@ import { addLoader } from "../Components/Loader";
 import { ErrorSceneName } from "../Reconnecting/ErrorScene";
 import { localUserStore } from "../../Connexion/LocalUserStore";
 import { iframeListener } from "../../Api/IframeListener";
+import { HtmlUtils } from "../../WebRtc/HtmlUtils";
 import Texture = Phaser.Textures.Texture;
 import Sprite = Phaser.GameObjects.Sprite;
 import CanvasTexture = Phaser.Textures.CanvasTexture;
 import GameObject = Phaser.GameObjects.GameObject;
 import FILE_LOAD_ERROR = Phaser.Loader.Events.FILE_LOAD_ERROR;
 import DOMElement = Phaser.GameObjects.DOMElement;
-import { Subscription } from "rxjs";
+import EVENT_TYPE = Phaser.Scenes.Events
+import type { Subscription } from "rxjs";
 import { worldFullMessageStream } from "../../Connexion/WorldFullMessageStream";
 import { lazyLoadCompanionResource } from "../Companion/CompanionTexturesLoadingManager";
+import RenderTexture = Phaser.GameObjects.RenderTexture;
+import Tilemap = Phaser.Tilemaps.Tilemap;
+import { DirtyScene } from "./DirtyScene";
 import { TextUtils } from "../Components/TextUtils";
 import { touchScreenManager } from "../../Touch/TouchScreenManager";
 import { PinchManager } from "../UserInput/PinchManager";
 import { joystickBaseImg, joystickBaseKey, joystickThumbImg, joystickThumbKey } from "../Components/MobileJoystick";
-import { MenuScene, MenuSceneName } from '../Menu/MenuScene';
-import { HasMovedEvent } from '../../Api/Events/HasMovedEvent';
+import { DEPTH_OVERLAY_INDEX } from "./DepthIndexes";
+import { waScaleManager } from "../Services/WaScaleManager";
+import { peerStore } from "../../Stores/PeerStore";
+import { EmoteManager } from "./EmoteManager";
+import type { HasMovedEvent } from '../../Api/Events/HasMovedEvent';
 import { gameSceneIframeListeners } from './GameSceneIframeListener';
-import { Vector } from 'matter';
+import { MenuScene, MenuSceneName } from '../Menu/MenuScene';
 import { Vector2 } from '../../utility/vector';
 
 export interface GameSceneInitInterface {
@@ -131,13 +137,13 @@ interface DeleteGroupEventInterface {
 
 const defaultStartLayerName = 'start';
 
-export class GameScene extends ResizableScene implements CenterListener {
+export class GameScene extends DirtyScene implements CenterListener {
     Terrains: Array<Phaser.Tilemaps.Tileset>;
-    CurrentPlayer!: CurrentGamerInterface;
+    CurrentPlayer!: Player;
     MapPlayers!: Phaser.Physics.Arcade.Group;
     MapPlayersByKey: Map<number, RemotePlayer> = new Map<number, RemotePlayer>();
     Map!: Phaser.Tilemaps.Tilemap;
-    Layers!: Array<Phaser.Tilemaps.StaticTilemapLayer>;
+    Layers!: Array<Phaser.Tilemaps.TilemapLayer>;
     Objects!: Array<Phaser.Physics.Arcade.Sprite>;
     mapFile!: ITiledMap;
     groups: Map<number, Sprite>;
@@ -153,10 +159,11 @@ export class GameScene extends ResizableScene implements CenterListener {
     private GlobalMessageManager!: GlobalMessageManager;
     public ConsoleGlobalMessageManager!: ConsoleGlobalMessageManager;
     private connectionAnswerPromise: Promise<RoomJoinedMessageInterface>;
-    private connectionAnswerPromiseResolve!: (value?: RoomJoinedMessageInterface | PromiseLike<RoomJoinedMessageInterface>) => void;
+    private connectionAnswerPromiseResolve!: (value: RoomJoinedMessageInterface | PromiseLike<RoomJoinedMessageInterface>) => void;
     // A promise that will resolve when the "create" method is called (signaling loading is ended)
     private createPromise: Promise<void>;
     private createPromiseResolve!: (value?: void | PromiseLike<void>) => void;
+    private peerStoreUnsubscribe!: () => void;
     MapUrlFile: string;
     RoomId: string;
     instance: string;
@@ -186,6 +193,9 @@ export class GameScene extends ResizableScene implements CenterListener {
     private messageSubscription: Subscription | null = null;
     public popUpElements: Map<number, DOMElement> = new Map<number, Phaser.GameObjects.DOMElement>();
     private originalMapUrl: string | undefined;
+    private pinchManager: PinchManager | undefined;
+    private mapTransitioning: boolean = false; //used to prevent transitions happenning at the same time.
+    private emoteManager!: EmoteManager;
 
     constructor(private room: Room, MapUrlFile: string, customKey?: string | undefined) {
         super({
@@ -201,15 +211,14 @@ export class GameScene extends ResizableScene implements CenterListener {
 
         this.createPromise = new Promise<void>((resolve, reject): void => {
             this.createPromiseResolve = resolve;
-        })
+        });
         this.connectionAnswerPromise = new Promise<RoomJoinedMessageInterface>((resolve, reject): void => {
             this.connectionAnswerPromiseResolve = resolve;
-        })
+        });
     }
 
     //hook preload scene
     preload(): void {
-        addLoader(this);
         const localUser = localUserStore.getLocalUser();
         const textures = localUser?.textures;
         if (textures) {
@@ -223,6 +232,11 @@ export class GameScene extends ResizableScene implements CenterListener {
             this.load.image(joystickBaseKey, joystickBaseImg);
             this.load.image(joystickThumbKey, joystickThumbImg);
         }
+        this.load.audio('audio-webrtc-in', '/resources/objects/webrtc-in.mp3');
+        this.load.audio('audio-webrtc-out', '/resources/objects/webrtc-out.mp3');
+        //this.load.audio('audio-report-message', '/resources/objects/report-message.mp3');
+        this.sound.pauseOnBlur = false;
+
         this.load.on(FILE_LOAD_ERROR, (file: { src: string }) => {
             // If we happen to be in HTTP and we are trying to load a URL in HTTPS only... (this happens only in dev environments)
             if (window.location.protocol === 'http:' && file.src === this.MapUrlFile && file.src.startsWith('http:') && this.originalMapUrl === undefined) {
@@ -269,6 +283,17 @@ export class GameScene extends ResizableScene implements CenterListener {
 
         this.load.spritesheet('layout_modes', 'resources/objects/layout_modes.png', { frameWidth: 32, frameHeight: 32 });
         this.load.bitmapFont('main_font', 'resources/fonts/arcade.png', 'resources/fonts/arcade.xml');
+        //eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (this.load as any).rexWebFont({
+            custom: {
+                families: ['Press Start 2P'],
+                urls: ['/resources/fonts/fonts.css'],
+                testString: 'abcdefg'
+            },
+        });
+
+        //this function must stay at the end of preload function
+        addLoader(this);
     }
 
     // FIXME: we need to put a "unknown" instead of a "any" and validate the structure of the JSON we are receiving.
@@ -367,15 +392,17 @@ export class GameScene extends ResizableScene implements CenterListener {
 
     //hook create scene
     create(): void {
+        this.trackDirtyAnims();
+
         gameManager.gameSceneIsCreated(this);
         urlManager.pushRoomIdToUrl(this.room);
         this.startLayerName = urlManager.getStartLayerNameFromUrl();
 
         if (touchScreenManager.supportTouchScreen) {
-            new PinchManager(this);
+            this.pinchManager = new PinchManager(this);
         }
 
-        this.messageSubscription = worldFullMessageStream.stream.subscribe((message) => this.showWorldFullError())
+        this.messageSubscription = worldFullMessageStream.stream.subscribe((message) => this.showWorldFullError(message))
 
         const playerName = gameManager.getPlayerName();
         if (!playerName) {
@@ -397,12 +424,11 @@ export class GameScene extends ResizableScene implements CenterListener {
         this.physics.world.setBounds(0, 0, this.Map.widthInPixels, this.Map.heightInPixels);
 
         //add layer on map
-        this.Layers = new Array<Phaser.Tilemaps.StaticTilemapLayer>();
-
+        this.Layers = new Array<Phaser.Tilemaps.TilemapLayer>();
         let depth = -2;
         for (const layer of this.gameMap.layersIterator) {
             if (layer.type === 'tilelayer') {
-                this.addLayer(this.Map.createStaticLayer(layer.name, this.Terrains, 0, 0).setDepth(depth));
+                this.addLayer(this.Map.createLayer(layer.name, this.Terrains, 0, 0).setDepth(depth));
 
                 const exitSceneUrl = this.getExitSceneUrl(layer);
                 if (exitSceneUrl !== undefined) {
@@ -414,7 +440,7 @@ export class GameScene extends ResizableScene implements CenterListener {
                 }
             }
             if (layer.type === 'objectgroup' && layer.name === 'floorLayer') {
-                depth = 10000;
+                depth = DEPTH_OVERLAY_INDEX;
             }
             if (layer.type === 'objectgroup') {
                 for (const object of layer.objects) {
@@ -443,8 +469,8 @@ export class GameScene extends ResizableScene implements CenterListener {
 
 
         //create input to move
-        mediaManager.setUserInputManager(this.userInputManager);
         this.userInputManager = new UserInputManager(this);
+        mediaManager.setUserInputManager(this.userInputManager);
 
         if (localUserStore.getFullscreen()) {
             document.querySelector('body')?.requestFullscreen();
@@ -505,6 +531,23 @@ export class GameScene extends ResizableScene implements CenterListener {
         if (!this.room.isDisconnected()) {
             this.connect();
         }
+
+        this.emoteManager = new EmoteManager(this);
+
+        let oldPeerNumber = 0;
+        this.peerStoreUnsubscribe = peerStore.subscribe((peers) => {
+            const newPeerNumber = peers.size;
+            if (newPeerNumber > oldPeerNumber) {
+                this.sound.play('audio-webrtc-in', {
+                    volume: 0.2
+                });
+            } else if (newPeerNumber < oldPeerNumber) {
+                this.sound.play('audio-webrtc-out', {
+                    volume: 0.2
+                });
+            }
+            oldPeerNumber = newPeerNumber;
+        });
     }
 
     /**
@@ -537,6 +580,7 @@ export class GameScene extends ResizableScene implements CenterListener {
                     characterLayers: message.characterLayers,
                     name: message.name,
                     position: message.position,
+                    visitCardUrl: message.visitCardUrl,
                     companion: message.companion
                 }
                 this.addPlayer(userMessage);
@@ -609,6 +653,7 @@ export class GameScene extends ResizableScene implements CenterListener {
 
             // When connection is performed, let's connect SimplePeer
             this.simplePeer = new SimplePeer(this.connection, !this.room.isPublic, this.playerName);
+            peerStore.connectToSimplePeer(this.simplePeer);
             this.GlobalMessageManager = new GlobalMessageManager(this.connection);
             userMessageManager.setReceiveBanListener(this.bannedUser.bind(this));
 
@@ -795,6 +840,8 @@ export class GameScene extends ResizableScene implements CenterListener {
     }
 
     public onMapExit(exitKey: string) {
+        if (this.mapTransitioning) return;
+        this.mapTransitioning = true;
         const { roomId, hash } = Room.getIdFromIdentifier(exitKey, this.MapUrlFile, this.instance);
         if (!roomId) throw new Error('Could not find the room from its exit key: ' + exitKey);
         urlManager.pushStartLayerNameToUrl(hash);
@@ -814,6 +861,7 @@ export class GameScene extends ResizableScene implements CenterListener {
             this.initPositionFromLayerName(hash || defaultStartLayerName);
             this.CurrentPlayer.x = this.startX;
             this.CurrentPlayer.y = this.startY;
+            setTimeout(() => this.mapTransitioning = false, 500);
         }
     }
 
@@ -830,11 +878,16 @@ export class GameScene extends ResizableScene implements CenterListener {
         audioManager.unloadAudio();
         // We are completely destroying the current scene to avoid using a half-backed instance when coming back to the same map.
         this.connection?.closeConnection();
-        this.simplePeer.closeAllConnections();
+        this.simplePeer?.closeAllConnections();
         this.simplePeer?.unregister();
         this.messageSubscription?.unsubscribe();
+        this.userInputManager.destroy();
+        this.pinchManager?.destroy();
+        this.emoteManager.destroy();
+        this.peerStoreUnsubscribe();
 
         gameSceneIframeListeners.unregisterListeners()
+        mediaManager.hideGameOverlay();
     }
 
     private removeAllRemotePlayers(): void {
@@ -945,7 +998,7 @@ export class GameScene extends ResizableScene implements CenterListener {
     public async loadNextGame(exitSceneIdentifier: string) {
         const { roomId, hash } = Room.getIdFromIdentifier(exitSceneIdentifier, this.MapUrlFile, this.instance);
         const room = new Room(roomId);
-        await gameManager.loadMap(room, this.scene);
+        return gameManager.loadMap(room, this.scene).catch(() => { });
     }
 
     private startUser(layer: ITiledMapTileLayer): PositionInterface {
@@ -997,17 +1050,17 @@ export class GameScene extends ResizableScene implements CenterListener {
     //todo: in a dedicated class/function?
     initCamera() {
         this.cameras.main.setBounds(0, 0, this.Map.widthInPixels, this.Map.heightInPixels);
+        this.cameras.main.startFollow(this.CurrentPlayer, true);
         this.updateCameraOffset();
-        this.cameras.main.setZoom(ZOOM_LEVEL);
     }
 
-    addLayer(Layer: Phaser.Tilemaps.StaticTilemapLayer) {
+    addLayer(Layer: Phaser.Tilemaps.TilemapLayer) {
         this.Layers.push(Layer);
     }
 
     createCollisionWithPlayer() {
         //add collision layer
-        this.Layers.forEach((Layer: Phaser.Tilemaps.StaticTilemapLayer) => {
+        this.Layers.forEach((Layer: Phaser.Tilemaps.TilemapLayer) => {
             this.physics.add.collider(this.CurrentPlayer, Layer, (object1: GameObject, object2: GameObject) => {
                 //this.CurrentPlayer.say("Collision with layer : "+ (object2 as Tile).layer.name)
             });
@@ -1039,6 +1092,15 @@ export class GameScene extends ResizableScene implements CenterListener {
                 this.companion,
                 this.companion !== null ? lazyLoadCompanionResource(this.load, this.companion) : undefined
             );
+            this.CurrentPlayer.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+                if (pointer.wasTouch && (pointer.event as TouchEvent).touches.length > 1) {
+                    return; //we don't want the menu to open when pinching on a touch screen.
+                }
+                this.emoteManager.getMenuImages().then((emoteMenuElements) => this.CurrentPlayer.openOrCloseEmoteMenu(emoteMenuElements))
+            })
+            this.CurrentPlayer.on(requestEmoteEventName, (emoteKey: string) => {
+                this.connection?.emitEmoteEvent(emoteKey);
+            })
         } catch (err) {
             if (err instanceof TextureError) {
                 gameManager.leaveGame(this, SelectCharacterSceneName, new SelectCharacterScene());
@@ -1136,12 +1198,14 @@ export class GameScene extends ResizableScene implements CenterListener {
      * @param delta The delta time in ms since the last frame. This is a smoothed and capped value based on the FPS rate.
      */
     update(time: number, delta: number): void {
-        mediaManager.setLastUpdateScene();
+        this.dirty = false;
+        mediaManager.updateScene();
         this.currentTick = time;
         this.CurrentPlayer.moveUser(delta);
 
         // Let's handle all events
         while (this.pendingEvents.length !== 0) {
+            this.dirty = true;
             const event = this.pendingEvents.dequeue();
             switch (event.type) {
                 case "InitUserPositionEvent":
@@ -1167,6 +1231,7 @@ export class GameScene extends ResizableScene implements CenterListener {
         // Let's move all users
         const updatedPlayersPositions = this.playersPositionInterpolator.getUpdatedPositions(time);
         updatedPlayersPositions.forEach((moveEvent: HasMovedEvent, userId: number) => {
+            this.dirty = true;
             const player: RemotePlayer | undefined = this.MapPlayersByKey.get(userId);
             if (player === undefined) {
                 throw new Error('Cannot find player with ID "' + userId + '"');
@@ -1230,6 +1295,7 @@ export class GameScene extends ResizableScene implements CenterListener {
             texturesPromise,
             addPlayerData.position.direction as PlayerAnimationDirections,
             addPlayerData.position.moving,
+            addPlayerData.visitCardUrl,
             addPlayerData.companion,
             addPlayerData.companion !== null ? lazyLoadCompanionResource(this.load, addPlayerData.companion) : undefined
         );
@@ -1337,6 +1403,7 @@ export class GameScene extends ResizableScene implements CenterListener {
     }
 
     public onResize(): void {
+        super.onResize();
         this.reposition();
 
         // Send new viewport to server
@@ -1359,19 +1426,18 @@ export class GameScene extends ResizableScene implements CenterListener {
     }
 
     /**
-     * Updates the offset of the character compared to the center of the screen according to the layout mananger
-     * (tries to put the character in the center of the reamining space if there is a discussion going on.
+     * Updates the offset of the character compared to the center of the screen according to the layout manager
+     * (tries to put the character in the center of the remaining space if there is a discussion going on.
      */
     private updateCameraOffset(): void {
         const array = layoutManager.findBiggestAvailableArray();
-        let xCenter = (array.xEnd - array.xStart) / 2 + array.xStart;
-        let yCenter = (array.yEnd - array.yStart) / 2 + array.yStart;
+        const xCenter = (array.xEnd - array.xStart) / 2 + array.xStart;
+        const yCenter = (array.yEnd - array.yStart) / 2 + array.yStart;
 
+        const game = HtmlUtils.querySelectorOrFail<HTMLCanvasElement>('#game canvas');
         // Let's put this in Game coordinates by applying the zoom level:
-        xCenter /= ZOOM_LEVEL * RESOLUTION;
-        yCenter /= ZOOM_LEVEL * RESOLUTION;
 
-        this.cameras.main.startFollow(this.CurrentPlayer, true, 1, 1, xCenter - this.game.renderer.width / 2, yCenter - this.game.renderer.height / 2);
+        this.cameras.main.setFollowOffset((xCenter - game.offsetWidth / 2) * window.devicePixelRatio / this.scale.zoom, (yCenter - game.offsetHeight / 2) * window.devicePixelRatio / this.scale.zoom);
     }
 
     public onCenterChange(): void {
@@ -1414,14 +1480,29 @@ export class GameScene extends ResizableScene implements CenterListener {
     }
 
     //todo: put this into an 'orchestrator' scene (EntryScene?)
-    private showWorldFullError(): void {
+    private showWorldFullError(message: string | null): void {
         this.cleanupClosingScene();
         this.scene.stop(ReconnectingSceneName);
+        this.scene.remove(ReconnectingSceneName);
         this.userInputManager.disableControls();
-        this.scene.start(ErrorSceneName, {
-            title: 'Connection rejected',
-            subTitle: 'The world you are trying to join is full. Try again later.',
-            message: 'If you want more information, you may contact us at: workadventure@thecodingmachine.com'
-        });
+        //FIX ME to use status code
+        if (message == undefined) {
+            this.scene.start(ErrorSceneName, {
+                title: 'Connection rejected',
+                subTitle: 'The world you are trying to join is full. Try again later.',
+                message: 'If you want more information, you may contact us at: workadventure@thecodingmachine.com'
+            });
+        } else {
+            this.scene.start(ErrorSceneName, {
+                title: 'Connection rejected',
+                subTitle: 'You cannot join the World. Try again later. \n\r \n\r Error: ' + message + '.',
+                message: 'If you want more information, you may contact administrator or contact us at: workadventure@thecodingmachine.com'
+            });
+        }
+    }
+
+    zoomByFactor(zoomFactor: number) {
+        waScaleManager.zoomModifier *= zoomFactor;
+        this.updateCameraOffset();
     }
 }

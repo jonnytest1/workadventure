@@ -1,13 +1,14 @@
-import { Subscription } from 'rxjs';
-import { PlayerStateObject } from '../../Api/Events/ApiGameStateEvent';
+import type { Subscription } from 'rxjs';
+import type { PlayerStateObject } from '../../Api/Events/ApiGameStateEvent';
 import { iframeListener } from '../../Api/IframeListener';
 import { localUserStore } from '../../Connexion/LocalUserStore';
 import { HtmlUtils } from '../../WebRtc/HtmlUtils';
 import { layoutManager } from '../../WebRtc/LayoutManager';
-import { RemotePlayer } from '../Entity/RemotePlayer';
+import type { RemotePlayer } from '../Entity/RemotePlayer';
 import { Sprite } from '../Entity/Sprite';
-import { ITiledMapObject } from '../Map/ITiledMap';
-import { GameScene } from './GameScene';
+import type { ITiledMapObject } from '../Map/ITiledMap';
+import type { GameScene } from './GameScene';
+import { soundManager } from './SoundManager';
 import EVENT_TYPE = Phaser.Scenes.Events
 
 let iframeSubscriptionList: Array<Subscription> = []
@@ -143,6 +144,24 @@ ${escapedMessage}
                 players: playerObject
             })
         }));
+
+
+
+        iframeSubscriptionList.push(iframeListener.playSoundStream.subscribe((playSoundEvent) => {
+            const url = new URL(playSoundEvent.url, gameScene.MapUrlFile);
+            soundManager.playSound(gameScene.load, gameScene.sound, url.toString(), playSoundEvent.config);
+        }))
+
+        iframeSubscriptionList.push(iframeListener.stopSoundStream.subscribe((stopSoundEvent) => {
+            const url = new URL(stopSoundEvent.url, gameScene.MapUrlFile);
+            soundManager.stopSound(gameScene.sound, url.toString());
+        }))
+
+        iframeSubscriptionList.push(iframeListener.loadSoundStream.subscribe((loadSoundEvent) => {
+            const url = new URL(loadSoundEvent.url, gameScene.MapUrlFile);
+            soundManager.loadSound(gameScene.load, gameScene.sound, url.toString());
+        }))
+
 
 
         iframeSubscriptionList.push(iframeListener.updateTileEvent.subscribe(event => {

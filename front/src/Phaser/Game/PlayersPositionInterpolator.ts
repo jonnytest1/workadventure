@@ -2,8 +2,8 @@
  * This class is in charge of computing the position of all players.
  * Player movement is delayed by 200ms so position depends on ticks.
  */
-import { HasMovedEvent } from '../../Api/Events/HasMovedEvent';
-import { PlayerMovement } from "./PlayerMovement";
+import type { HasMovedEvent } from '../../Api/Events/HasMovedEvent';
+import type { PlayerMovement } from "./PlayerMovement";
 
 export class PlayersPositionInterpolator {
     playerMovements: Map<number, PlayerMovement> = new Map<number, PlayerMovement>();

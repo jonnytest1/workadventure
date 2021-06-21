@@ -1,22 +1,21 @@
 
-import { GameStateEvent } from './ApiGameStateEvent';
-import { UpdateTileEvent } from './ApiUpdateTileEvent';
-import { ButtonClickedEvent } from './ButtonClickedEvent';
-import { ChatEvent } from './ChatEvent';
-import { ClosePopupEvent } from './ClosePopupEvent';
-import { EnterLeaveEvent } from './EnterLeaveEvent';
-import { GoToPageEvent } from './GoToPageEvent';
-import { LoadPageEvent } from './LoadPageEvent';
-import { MenuItemClickedEvent } from './MenuItemClickedEvent';
-import { MenuItemRegisterEvent } from './MenuItemRegisterEvent';
-import { HasMovedEvent } from './HasMovedEvent';
-import { OpenCoWebSiteEvent } from './OpenCoWebSiteEvent';
-import { OpenPopupEvent } from './OpenPopupEvent';
-import { OpenTabEvent } from './OpenTabEvent';
-import { MessageReferenceEvent, TriggerMessageEvent } from './TriggerMessageEvent';
-import { UserInputChatEvent } from './UserInputChatEvent';
-
-
+import type { GameStateEvent } from './ApiGameStateEvent';
+import type { UpdateTileEvent } from './ApiUpdateTileEvent';
+import type { ButtonClickedEvent } from './ButtonClickedEvent';
+import type { ChatEvent } from './ChatEvent';
+import type { ClosePopupEvent } from './ClosePopupEvent';
+import type { EnterLeaveEvent } from './EnterLeaveEvent';
+import type { GoToPageEvent } from './GoToPageEvent';
+import type { LoadPageEvent } from './LoadPageEvent';
+import type { MenuItemClickedEvent } from './MenuItemClickedEvent';
+import type { OpenPopupEvent } from './OpenPopupEvent';
+import type { MenuItemRegisterEvent } from './MenuItemRegisterEvent';
+import type { OpenTabEvent } from './OpenTabEvent';
+import type { UserInputChatEvent } from './UserInputChatEvent';
+import type { OpenCoWebSiteEvent } from './OpenCoWebSiteEvent';
+import type { LoadSoundEvent } from "./LoadSoundEvent";
+import type { MessageReferenceEvent, TriggerMessageEvent } from './TriggerMessageEvent';
+import type { PlaySoundEvent } from './PlaySoundEvent';
 export interface TypedMessageEvent<T> extends MessageEvent {
     data: T
 }
@@ -39,11 +38,16 @@ export type IframeEventMap = {
     loadPage: LoadPageEvent
     triggerMessage: TriggerMessageEvent
     removeTriggerMessage: MessageReferenceEvent
+    loadSound: LoadSoundEvent
+    playSound: PlaySoundEvent
+    stopSound: null,
 }
 export interface IframeEvent<T extends keyof IframeEventMap> {
     type: T;
     data: IframeEventMap[T];
 }
+
+
 
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

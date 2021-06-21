@@ -12,6 +12,8 @@ import { LoginScene, LoginSceneName } from "../Login/LoginScene";
 import { SelectCharacterScene, SelectCharacterSceneName } from "../Login/SelectCharacterScene";
 import { SelectCompanionScene, SelectCompanionSceneName } from "../Login/SelectCompanionScene";
 import { gameReportKey, gameReportRessource, ReportMenu } from "./ReportMenu";
+import {menuIconVisible} from "../../Stores/MenuStore";
+import {videoConstraintStore} from "../../Stores/MediaStore";
 
 export const MenuSceneName = 'MenuScene';
 const gameMenuKey = 'gameMenu';
@@ -68,6 +70,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     create() {
+        menuIconVisible.set(true);
         this.menuElement = this.add.dom(closedSideMenuX, 30).createFromCache(gameMenuKey);
         this.menuElement.setOrigin(0);
         MenuScene.revealMenusAfterInit(this.menuElement, 'gameMenu');
@@ -207,11 +210,11 @@ export class MenuScene extends Phaser.Scene {
             }
         });
 
-        let middleY = (window.innerHeight / 3) - (257);
+        let middleY = this.scale.height / 2 - 392/2;
         if (middleY < 0) {
             middleY = 0;
         }
-        let middleX = (window.innerWidth / 3) - 298;
+        let middleX = this.scale.width / 2 - 457/2;
         if (middleX < 0) {
             middleX = 0;
         }
@@ -251,11 +254,11 @@ export class MenuScene extends Phaser.Scene {
 
         this.gameShareOpened = true;
 
-        let middleY = (window.innerHeight / 3) - (257);
+        let middleY = this.scale.height / 2 - 85;
         if (middleY < 0) {
             middleY = 0;
         }
-        let middleX = (window.innerWidth / 3) - 298;
+        let middleX = this.scale.width / 2 - 200;
         if (middleX < 0) {
             middleX = 0;
         }
@@ -355,7 +358,7 @@ export class MenuScene extends Phaser.Scene {
         if (valueVideo !== this.videoQualityValue) {
             this.videoQualityValue = valueVideo;
             localUserStore.setVideoQualityValue(valueVideo);
-            mediaManager.updateCameraQuality(valueVideo);
+            videoConstraintStore.setFrameRate(valueVideo);
         }
         this.closeGameQualityMenu();
     }
@@ -382,5 +385,9 @@ export class MenuScene extends Phaser.Scene {
                 body.requestFullscreen();
             }
         }
+    }
+
+    public isDirty(): boolean {
+        return false;
     }
 }
