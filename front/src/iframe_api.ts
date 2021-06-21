@@ -183,7 +183,7 @@ const wa = {
      */
     openCoWebSite(url: string, options: OpenCoWebSiteOptionsEvent = {}): void {
         console.warn('Method WA.openCoWebSite is deprecated. Please use WA.nav.openCoWebSite instead');
-        nav.openCoWebSite(url);
+        nav.openCoWebSite(url, options);
     },
 
     /**

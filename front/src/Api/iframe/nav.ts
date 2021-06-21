@@ -1,7 +1,7 @@
 import type { GoToPageEvent } from '../Events/GoToPageEvent';
 import type { OpenTabEvent } from '../Events/OpenTabEvent';
 import { IframeApiContribution, sendToWorkadventure } from './IframeApiContribution';
-import type {OpenCoWebSiteEvent} from "../Events/OpenCoWebSiteEvent";
+import type { OpenCoWebSiteEvent, OpenCoWebSiteOptionsEvent } from "../Events/OpenCoWebSiteEvent";
 
 
 class WorkadventureNavigationCommands extends IframeApiContribution<WorkadventureNavigationCommands> {
@@ -35,11 +35,12 @@ class WorkadventureNavigationCommands extends IframeApiContribution<Workadventur
         });
     }
 
-    openCoWebSite(url: string): void {
+    openCoWebSite(url: string, options: OpenCoWebSiteOptionsEvent = {}): void {
         sendToWorkadventure({
             "type": 'openCoWebSite',
             "data": {
-                url
+                url,
+                options
             } as OpenCoWebSiteEvent
         });
     }
