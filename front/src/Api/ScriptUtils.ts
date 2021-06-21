@@ -1,5 +1,5 @@
 import { coWebsiteManager } from "../WebRtc/CoWebsiteManager";
-import { OpenCoWebSiteOptionsEvent } from './Events/OpenCoWebSiteEvent';
+import type { OpenCoWebSiteOptionsEvent } from './Events/OpenCoWebSiteEvent';
 
 class ScriptUtils {
 
@@ -49,7 +49,7 @@ class ScriptUtils {
 
             }
         }
-           coWebsiteManager.loadCoWebsite(url, base);
+        coWebsiteManager.loadCoWebsite(url, base);
     }
 
     public closeCoWebSite() {

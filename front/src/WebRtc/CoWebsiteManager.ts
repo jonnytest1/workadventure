@@ -1,8 +1,8 @@
 import { Subject } from "rxjs";
-import { OpenCoWebSiteOptionsEvent } from '../Api/Events/OpenCoWebSiteEvent';
 import { iframeListener } from "../Api/IframeListener";
 import { HtmlUtils } from "./HtmlUtils";
-import {touchScreenManager} from "../Touch/TouchScreenManager";
+import { touchScreenManager } from "../Touch/TouchScreenManager";
+import type { OpenCoWebSiteOptionsEvent } from '../Api/Events/OpenCoWebSiteEvent';
 
 enum iframeStates {
     closed = 1,
@@ -39,7 +39,7 @@ class CoWebsiteManager {
     private resizing: boolean = false;
     private cowebsiteMainDom: HTMLDivElement;
     private cowebsiteAsideDom: HTMLDivElement;
-    private previousTouchMoveCoordinates: TouchMoveCoordinates|null = null; //only use on touchscreens to track touch movement
+    private previousTouchMoveCoordinates: TouchMoveCoordinates | null = null; //only use on touchscreens to track touch movement
 
 
     private isOverlay = true
@@ -91,32 +91,32 @@ class CoWebsiteManager {
         });
     }
 
-    private initResizeListeners(touchMode:boolean) {
-        const movecallback = (event:MouseEvent|TouchEvent) => {
+    private initResizeListeners(touchMode: boolean) {
+        const movecallback = (event: MouseEvent | TouchEvent) => {
             let x, y;
             if (event.type === 'mousemove') {
                 x = (event as MouseEvent).movementX / this.getDevicePixelRatio();
                 y = (event as MouseEvent).movementY / this.getDevicePixelRatio();
             } else {
                 const touchEvent = (event as TouchEvent).touches[0];
-                const last = {x: touchEvent.pageX, y: touchEvent.pageY};
+                const last = { x: touchEvent.pageX, y: touchEvent.pageY };
                 const previous = this.previousTouchMoveCoordinates as TouchMoveCoordinates;
                 this.previousTouchMoveCoordinates = last;
                 x = last.x - previous.x;
                 y = last.y - previous.y;
             }
-            
-            
+
+
             this.verticalMode ? this.height += y : this.width -= x;
             this.fire();
         }
 
-        this.cowebsiteAsideDom.addEventListener( touchMode ? 'touchstart' : 'mousedown', (event) => {
+        this.cowebsiteAsideDom.addEventListener(touchMode ? 'touchstart' : 'mousedown', (event) => {
             this.resizing = true;
             this.getIframeDom().style.display = 'none';
             if (touchMode) {
                 const touchEvent = (event as TouchEvent).touches[0];
-                this.previousTouchMoveCoordinates = {x: touchEvent.pageX, y: touchEvent.pageY};
+                this.previousTouchMoveCoordinates = { x: touchEvent.pageX, y: touchEvent.pageY };
             }
 
             document.addEventListener(touchMode ? 'touchmove' : 'mousemove', movecallback);
