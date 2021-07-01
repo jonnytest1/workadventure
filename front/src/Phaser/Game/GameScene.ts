@@ -179,7 +179,7 @@ export class GameScene extends DirtyScene implements CenterListener {
 
     private presentationModeSprite!: Sprite;
     private chatModeSprite!: Sprite;
-    private gameMap!: GameMap;
+    public gameMap!: GameMap;
     private actionableItems: Map<number, ActionableItem> = new Map<number, ActionableItem>();
     // The item that can be selected by pressing the space key.
     private outlinedItem: ActionableItem | null = null;

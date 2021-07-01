@@ -17,9 +17,15 @@ export class GameMap {
     public readonly layersIterator: LayersIterator;
 
     public exitUrls: Array<string> = []
-
+    coordinateScale?: number
     public constructor(private map: ITiledMap) {
         this.layersIterator = new LayersIterator(map);
+
+        for (const prop of map.properties || []) {
+            if (prop.name == "coordinateScale" && typeof prop.value == "number") {
+                this.coordinateScale = prop.value
+            }
+        }
 
         for (const tileset of map.tilesets) {
             tileset?.tiles?.forEach(tile => {

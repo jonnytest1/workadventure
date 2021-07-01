@@ -1,9 +1,10 @@
-import {PlayerAnimationDirections} from "./Animation";
-import type {GameScene} from "../Game/GameScene";
-import {UserInputEvent, UserInputManager} from "../UserInput/UserInputManager";
-import {Character} from "../Entity/Character";
-import {userMovingStore} from "../../Stores/GameStore";
-import {RadialMenu, RadialMenuClickEvent, RadialMenuItem} from "../Components/RadialMenu";
+import { PlayerAnimationDirections } from "./Animation";
+import type { GameScene } from "../Game/GameScene";
+import { UserInputEvent, UserInputManager } from "../UserInput/UserInputManager";
+import { Character } from "../Entity/Character";
+import { userMovingStore } from "../../Stores/GameStore";
+import { RadialMenu, RadialMenuClickEvent, RadialMenuItem } from "../Components/RadialMenu";
+import type { Vector } from 'matter';
 
 export const hasMovedEventName = "hasMoved";
 export const requestEmoteEventName = "requestEmote";
@@ -11,8 +12,13 @@ export const requestEmoteEventName = "requestEmote";
 export class Player extends Character {
     private previousDirection: string = PlayerAnimationDirections.Down;
     private wasMoving: boolean = false;
-    private emoteMenu: RadialMenu|null = null;
+    private emoteMenu: RadialMenu | null = null;
     private updateListener: () => void;
+
+    private devicePosition?: GeolocationPosition;
+    private playerPosition?: GeolocationPosition;
+
+
 
     constructor(
         Scene: GameScene,
@@ -23,7 +29,7 @@ export class Player extends Character {
         direction: PlayerAnimationDirections,
         moving: boolean,
         private userInputManager: UserInputManager,
-        companion: string|null,
+        companion: string | null,
         companionTexturePromise?: Promise<string>
     ) {
         super(Scene, x, y, texturesPromise, name, direction, moving, 1, true, companion, companionTexturePromise);
@@ -38,6 +44,10 @@ export class Player extends Character {
             }
         };
         this.scene.events.addListener('postupdate', this.updateListener);
+
+        navigator.geolocation.watchPosition(position => {
+            this.devicePosition = position
+        })
     }
 
     moveUser(delta: number): void {
@@ -71,16 +81,41 @@ export class Player extends Character {
         }
         moving = moving || activeEvents.get(UserInputEvent.JoystickMove);
 
+        // @ts-ignore
+        if (x == 0 && y == 0 && this.playerPosition && this.devicePosition && this.scene.gameMap.coordinateScale !== undefined) {
+            const diff: Vector = {
+                x: this.devicePosition?.coords.latitude - this.playerPosition.coords.latitude,
+                y: this.devicePosition?.coords.longitude - this.playerPosition.coords.longitude
+            }
+            // @ts-ignore
+            x = diff.x * 1000 * this.scene.gameMap.coordinateScale;
+            // @ts-ignore
+            y = diff.y * 1000 * this.scene.gameMap.coordinateScale;
+
+            if (y < 0) {
+                direction = PlayerAnimationDirections.Up;
+            } else if (y > 0) {
+                direction = PlayerAnimationDirections.Down;
+            }
+
+            if (x < 0) {
+                direction = PlayerAnimationDirections.Left;
+            } else if (x > 0) {
+                direction = PlayerAnimationDirections.Right;
+            }
+        }
+
         if (x !== 0 || y !== 0) {
+            moving = true;
             this.move(x, y);
-            this.emit(hasMovedEventName, {moving, direction, x: this.x, y: this.y});
+            this.emit(hasMovedEventName, { moving, direction, x: this.x, y: this.y });
         } else if (this.wasMoving && moving) {
             // slow joystick movement
             this.move(0, 0);
-            this.emit(hasMovedEventName, {moving, direction: this.previousDirection, x: this.x, y: this.y});
+            this.emit(hasMovedEventName, { moving, direction: this.previousDirection, x: this.x, y: this.y });
         } else if (this.wasMoving && !moving) {
             this.stop();
-            this.emit(hasMovedEventName, {moving, direction: this.previousDirection, x: this.x, y: this.y});
+            this.emit(hasMovedEventName, { moving, direction: this.previousDirection, x: this.x, y: this.y });
         }
 
         if (direction !== null) {
@@ -88,21 +123,22 @@ export class Player extends Character {
         }
         this.wasMoving = moving;
         userMovingStore.set(moving);
+        this.playerPosition = this.devicePosition
     }
 
     public isMoving(): boolean {
         return this.wasMoving;
     }
 
-    openOrCloseEmoteMenu(emotes:RadialMenuItem[]) {
-        if(this.emoteMenu) {
+    openOrCloseEmoteMenu(emotes: RadialMenuItem[]) {
+        if (this.emoteMenu) {
             this.closeEmoteMenu();
         } else {
             this.openEmoteMenu(emotes);
         }
     }
 
-    openEmoteMenu(emotes:RadialMenuItem[]): void {
+    openEmoteMenu(emotes: RadialMenuItem[]): void {
         this.cancelPreviousEmote();
         this.emoteMenu = new RadialMenu(this.scene, this.x, this.y, emotes)
         this.emoteMenu.on(RadialMenuClickEvent, (item: RadialMenuItem) => {
