@@ -19,8 +19,8 @@ export class Vector2 {
             this.y = x.y;
             this.x = x.x;
         } else if (isGeoVector(x)) {
-            this.y = x.latitude;
-            this.x = x.longitude;
+            this.y = x.longitude;
+            this.x = x.latitude;
         } else if (y) {
             this.x = x;
             this.y = y;

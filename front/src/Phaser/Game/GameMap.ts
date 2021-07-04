@@ -68,7 +68,7 @@ export class GameMap {
         if (partialBottomRight.latitude && partialBottomRight.longitude) {
             this.bottomRight = new Vector2(partialBottomRight as GeolocationCoordinates);
         }
-        this.mapDimensions = new Vector2(this.map.tileheight * this.map.height, this.map.tilewidth * this.map.width)
+        this.mapDimensions = new Vector2(this.map.tilewidth * this.map.width, this.map.tileheight * this.map.height)
 
         if (this.bottomRight && this.topLeft) {
             this.geocoordinationDimensions = new Vector2(this.bottomRight)
