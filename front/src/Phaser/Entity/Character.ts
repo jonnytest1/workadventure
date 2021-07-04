@@ -1,13 +1,13 @@
-import {PlayerAnimationDirections, PlayerAnimationTypes} from "../Player/Animation";
-import {SpeechBubble} from "./SpeechBubble";
+import { PlayerAnimationDirections, PlayerAnimationTypes } from "../Player/Animation";
+import { SpeechBubble } from "./SpeechBubble";
 import Text = Phaser.GameObjects.Text;
 import Container = Phaser.GameObjects.Container;
 import Sprite = Phaser.GameObjects.Sprite;
-import {TextureError} from "../../Exception/TextureError";
-import {Companion} from "../Companion/Companion";
-import type {GameScene} from "../Game/GameScene";
-import {DEPTH_INGAME_TEXT_INDEX} from "../Game/DepthIndexes";
-import {waScaleManager} from "../Services/WaScaleManager";
+import { TextureError } from "../../Exception/TextureError";
+import { Companion } from "../Companion/Companion";
+import type { GameScene } from "../Game/GameScene";
+import { DEPTH_INGAME_TEXT_INDEX } from "../Game/DepthIndexes";
+import { waScaleManager } from "../Services/WaScaleManager";
 
 const playerNameY = - 25;
 
@@ -16,13 +16,13 @@ interface AnimationData {
     frameRate: number;
     repeat: number;
     frameModel: string; //todo use an enum
-    frames : number[]
+    frames: number[]
 }
 
 const interactiveRadius = 35;
 
 export abstract class Character extends Container {
-    private bubble: SpeechBubble|null = null;
+    private bubble: SpeechBubble | null = null;
     private readonly playerName: Text;
     public PlayerValue: string;
     public sprites: Map<string, Sprite>;
@@ -31,19 +31,19 @@ export abstract class Character extends Container {
     private invisible: boolean;
     public companion?: Companion;
     private emote: Phaser.GameObjects.Sprite | null = null;
-    private emoteTween: Phaser.Tweens.Tween|null = null;
+    private emoteTween: Phaser.Tweens.Tween | null = null;
 
-    constructor(scene: GameScene,
-                x: number,
-                y: number,
-                texturesPromise: Promise<string[]>,
-                name: string,
-                direction: PlayerAnimationDirections,
-                moving: boolean,
-                frame: string | number,
-                isClickable: boolean,
-                companion: string|null,
-                companionTexturePromise?: Promise<string>
+    constructor(public scene: GameScene,
+        x: number,
+        y: number,
+        texturesPromise: Promise<string[]>,
+        name: string,
+        direction: PlayerAnimationDirections,
+        moving: boolean,
+        frame: string | number,
+        isClickable: boolean,
+        companion: string | null,
+        companionTexturePromise?: Promise<string>
     ) {
         super(scene, x, y/*, texture, frame*/);
         this.PlayerValue = name;
@@ -57,7 +57,7 @@ export abstract class Character extends Container {
             this.invisible = false
         })
 
-        this.playerName = new Text(scene, 0,  playerNameY, name, {fontFamily: '"Press Start 2P"', fontSize: '8px', strokeThickness: 2, stroke: "gray"});
+        this.playerName = new Text(scene, 0, playerNameY, name, { fontFamily: '"Press Start 2P"', fontSize: '8px', strokeThickness: 2, stroke: "gray" });
         this.playerName.setOrigin(0.5).setDepth(DEPTH_INGAME_TEXT_INDEX);
         this.add(this.playerName);
 
@@ -94,7 +94,7 @@ export abstract class Character extends Container {
 
     public addTextures(textures: string[], frame?: string | number): void {
         for (const texture of textures) {
-            if(this.scene && !this.scene.textures.exists(texture)){
+            if (this.scene && !this.scene.textures.exists(texture)) {
                 throw new TextureError('texture not found');
             }
             const sprite = new Sprite(this.scene, 0, 0, texture, frame);
@@ -102,13 +102,13 @@ export abstract class Character extends Container {
             this.getPlayerAnimations(texture).forEach(d => {
                 this.scene.anims.create({
                     key: d.key,
-                    frames: this.scene.anims.generateFrameNumbers(d.frameModel, {frames: d.frames}),
+                    frames: this.scene.anims.generateFrameNumbers(d.frameModel, { frames: d.frames }),
                     frameRate: d.frameRate,
                     repeat: d.repeat
                 });
             })
             // Needed, otherwise, animations are not handled correctly.
-            if(this.scene) {
+            if (this.scene) {
                 this.scene.sys.updateList.add(sprite);
             }
             this.sprites.set(texture, sprite);
@@ -140,7 +140,7 @@ export abstract class Character extends Container {
             frames: [9, 10, 11, 10],
             frameRate: 10,
             repeat: -1
-        },{
+        }, {
             key: `${name}-${PlayerAnimationDirections.Down}-${PlayerAnimationTypes.Idle}`,
             frameModel: name,
             frames: [1],
@@ -167,7 +167,7 @@ export abstract class Character extends Container {
         }];
     }
 
-    protected playAnimation(direction : PlayerAnimationDirections, moving: boolean): void {
+    protected playAnimation(direction: PlayerAnimationDirections, moving: boolean): void {
         if (this.invisible) return;
         for (const [texture, sprite] of this.sprites.entries()) {
             if (!sprite.anims) {
@@ -175,9 +175,9 @@ export abstract class Character extends Container {
                 return;
             }
             if (moving && (!sprite.anims.currentAnim || sprite.anims.currentAnim.key !== direction)) {
-                sprite.play(texture+'-'+direction+'-'+PlayerAnimationTypes.Walk, true);
+                sprite.play(texture + '-' + direction + '-' + PlayerAnimationTypes.Walk, true);
             } else if (!moving) {
-                sprite.anims.play(texture + '-' + direction + '-'+PlayerAnimationTypes.Idle, true);
+                sprite.anims.play(texture + '-' + direction + '-' + PlayerAnimationTypes.Idle, true);
             }
         }
     }
@@ -217,7 +217,7 @@ export abstract class Character extends Container {
         }
     }
 
-    stop(){
+    stop() {
         this.getBody().setVelocity(0, 0);
         this.playAnimation(this.lastDirection, false);
     }
@@ -235,7 +235,7 @@ export abstract class Character extends Container {
 
     destroy(): void {
         for (const sprite of this.sprites.values()) {
-            if(this.scene) {
+            if (this.scene) {
                 this.scene.sys.updateList.remove(sprite);
             }
         }
@@ -250,7 +250,7 @@ export abstract class Character extends Container {
         const emoteY = -30 - scalingFactor * 10;
 
         this.playerName.setVisible(false);
-        this.emote = new Sprite(this.scene, 0,  0, emoteKey);
+        this.emote = new Sprite(this.scene, 0, 0, emoteKey);
         this.emote.setAlpha(0);
         this.emote.setScale(0.1 * scalingFactor);
         this.add(this.emote);

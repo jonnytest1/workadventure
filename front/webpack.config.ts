@@ -1,4 +1,4 @@
-import type {Configuration} from "webpack";
+import type { Configuration } from "webpack";
 import type WebpackDevServer from "webpack-dev-server";
 import path from 'path';
 import webpack from 'webpack';
@@ -7,7 +7,7 @@ import MiniCssExtractPlugin from 'mini-css-extract-plugin';
 import sveltePreprocess from 'svelte-preprocess';
 import ForkTsCheckerWebpackPlugin from "fork-ts-checker-webpack-plugin";
 import NodePolyfillPlugin from 'node-polyfill-webpack-plugin';
-import {DISPLAY_TERMS_OF_USE} from "./src/Enum/EnvironmentVariable";
+import { DISPLAY_TERMS_OF_USE } from "./src/Enum/EnvironmentVariable";
 
 const mode = process.env.NODE_ENV ?? 'development';
 const isProduction = mode === 'production';
@@ -19,7 +19,6 @@ module.exports = {
         'iframe_api': './src/iframe_api.ts'
     },
     mode: mode,
-    devtool: isDevelopment ? 'inline-source-map' : 'source-map',
     devServer: {
         contentBase: './dist',
         host: '0.0.0.0',
@@ -130,14 +129,14 @@ module.exports = {
         alias: {
             svelte: path.resolve('node_modules', 'svelte')
         },
-        extensions: [ '.tsx', '.ts', '.js', '.svelte' ],
+        extensions: ['.tsx', '.ts', '.js', '.svelte'],
         mainFields: ['svelte', 'browser', 'module', 'main']
     },
     output: {
         filename: (pathData) => {
             // Add a content hash only for the main bundle.
             // We want the iframe_api.js file to keep its name as it will be referenced from outside iframes.
-            return pathData.chunk?.name === 'main' ? 'js/[name].[contenthash].js': '[name].js';
+            return pathData.chunk?.name === 'main' ? 'js/[name].[contenthash].js' : '[name].js';
         },
         path: path.resolve(__dirname, 'dist'),
         publicPath: '/'
@@ -149,7 +148,7 @@ module.exports = {
                 files: './src/**/*.ts'
             }
         }),
-        new MiniCssExtractPlugin({filename: '[name].[contenthash].css'}),
+        new MiniCssExtractPlugin({ filename: '[name].[contenthash].css' }),
         new HtmlWebpackPlugin(
             {
                 template: './dist/index.tmpl.html.tmp',

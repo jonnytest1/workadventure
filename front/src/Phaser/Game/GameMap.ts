@@ -1,3 +1,4 @@
+import type { Vector } from 'matter';
 import { CustomVector, Vector2 } from '../../utility/vector';
 import type { ITiledMap, ITiledMapLayerProperty } from "../Map/ITiledMap";
 import { LayersIterator } from "../Map/LayersIterator";
@@ -17,13 +18,31 @@ export class GameMap {
     public readonly layersIterator: LayersIterator;
 
     public exitUrls: Array<string> = []
-    coordinateScale?: number
+
+    public topLeft?: Vector2
+    public bottomRight?: Vector
+
+
+    public mapDimensions: Vector2
+    public geocoordinationDimensions?: Vector2;
+
+
+
+
     public constructor(private map: ITiledMap) {
         this.layersIterator = new LayersIterator(map);
 
+        let partialTopLeft: Partial<GeolocationCoordinates> = {}
+        let partialBottomRight: Partial<GeolocationCoordinates> = {}
         for (const prop of map.properties || []) {
-            if (prop.name == "coordinateScale" && typeof prop.value == "number") {
-                this.coordinateScale = prop.value
+            if (prop.name == "startLat" && typeof prop.value == "number") {
+                partialTopLeft = { ...partialTopLeft, latitude: prop.value }
+            } else if (prop.name == "startLon" && typeof prop.value == "number") {
+                partialTopLeft = { ...partialTopLeft, longitude: prop.value }
+            } else if (prop.name == "endLat" && typeof prop.value == "number") {
+                partialBottomRight = { ...partialBottomRight, latitude: prop.value }
+            } else if (prop.name == "endLon" && typeof prop.value == "number") {
+                partialBottomRight = { ...partialBottomRight, longitude: prop.value }
             }
         }
 
@@ -38,6 +57,19 @@ export class GameMap {
                     })
                 }
             })
+        }
+
+        if (partialTopLeft.latitude && partialTopLeft.longitude) {
+            this.topLeft = new Vector2(partialTopLeft as GeolocationCoordinates);
+        }
+        if (partialBottomRight.latitude && partialBottomRight.longitude) {
+            this.bottomRight = new Vector2(partialBottomRight as GeolocationCoordinates);
+        }
+        this.mapDimensions = new Vector2(this.map.tileheight * this.map.height, this.map.tilewidth * this.map.width)
+
+        if (this.bottomRight && this.topLeft) {
+            this.geocoordinationDimensions = new Vector2(this.bottomRight)
+                .sub(this.topLeft)
         }
     }
 
@@ -75,6 +107,19 @@ export class GameMap {
                 this.trigger(oldPropName, oldPropValue, undefined, newProps);
             }
         }
+    }
+
+    public geoToMapPosition(coords: GeolocationCoordinates): Vector2 | undefined {
+        if (this.topLeft && this.geocoordinationDimensions) {
+
+            const mapPosition = new Vector2(coords)
+                .sub(this.topLeft)
+                .div(this.geocoordinationDimensions)
+                .mult(this.mapDimensions)
+
+            return mapPosition;
+        }
+        return undefined
     }
 
     public getCurrentProperties(): Map<string, string | boolean | number> {

@@ -5,6 +5,8 @@ import { Character } from "../Entity/Character";
 import { userMovingStore } from "../../Stores/GameStore";
 import { RadialMenu, RadialMenuClickEvent, RadialMenuItem } from "../Components/RadialMenu";
 import type { Vector } from 'matter';
+import { Vector2 } from '../../utility/vector';
+import { dir } from 'console';
 
 export const hasMovedEventName = "hasMoved";
 export const requestEmoteEventName = "requestEmote";
@@ -45,9 +47,13 @@ export class Player extends Character {
         };
         this.scene.events.addListener('postupdate', this.updateListener);
 
-        navigator.geolocation.watchPosition(position => {
-            this.devicePosition = position
-        })
+        if (this.scene.gameMap.geocoordinationDimensions) {
+            navigator.geolocation.watchPosition(position => {
+                this.devicePosition = position
+            }, undefined, {
+                enableHighAccuracy: true
+            })
+        }
     }
 
     moveUser(delta: number): void {
@@ -81,27 +87,33 @@ export class Player extends Character {
         }
         moving = moving || activeEvents.get(UserInputEvent.JoystickMove);
 
-        // @ts-ignore
-        if (x == 0 && y == 0 && this.playerPosition && this.devicePosition && this.scene.gameMap.coordinateScale !== undefined) {
-            const diff: Vector = {
-                x: this.devicePosition?.coords.latitude - this.playerPosition.coords.latitude,
-                y: this.devicePosition?.coords.longitude - this.playerPosition.coords.longitude
-            }
-            // @ts-ignore
-            x = diff.x * 1000 * this.scene.gameMap.coordinateScale;
-            // @ts-ignore
-            y = diff.y * 1000 * this.scene.gameMap.coordinateScale;
+        if (x == 0 && y == 0 && this.playerPosition
+            && this.devicePosition
+            && this.scene.gameMap.geocoordinationDimensions !== undefined) {
 
-            if (y < 0) {
-                direction = PlayerAnimationDirections.Up;
-            } else if (y > 0) {
-                direction = PlayerAnimationDirections.Down;
-            }
+            const mapPosition = this.scene.gameMap.geoToMapPosition(this.devicePosition.coords)
 
-            if (x < 0) {
-                direction = PlayerAnimationDirections.Left;
-            } else if (x > 0) {
-                direction = PlayerAnimationDirections.Right;
+            if (mapPosition) {
+                const delta = mapPosition.sub(new Vector2(this.x, this.y))
+                    .round();
+
+                x = delta.x
+                y = delta.y;
+
+                if (this.devicePosition.coords.heading) {
+                    const heading = this.devicePosition.coords.heading + 45 % 360
+                    if (heading > 270) {
+                        direction = PlayerAnimationDirections.Left
+                    } else if (heading > 180) {
+                        direction = PlayerAnimationDirections.Down
+                    } else if (heading > 90) {
+                        direction = PlayerAnimationDirections.Right
+                    } else {
+                        direction = PlayerAnimationDirections.Up
+                    }
+                } else {
+                    direction = PlayerAnimationDirections.Down
+                }
             }
         }
 
