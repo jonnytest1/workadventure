@@ -101,7 +101,10 @@ export class Player extends Character {
                 y = delta.y;
 
                 if (this.devicePosition.coords.heading) {
-                    const heading = this.devicePosition.coords.heading + 45 % 360
+                    let heading = this.devicePosition.coords.heading + 45 % 360
+                    if (this.scene.gameMap.geoRotation) {
+                        heading *= this.scene.gameMap.geoRotation
+                    }
                     if (heading > 270) {
                         direction = PlayerAnimationDirections.Left
                     } else if (heading > 180) {

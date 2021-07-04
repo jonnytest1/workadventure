@@ -25,6 +25,7 @@ export class GameMap {
 
     public mapDimensions: Vector2
     public geocoordinationDimensions?: Vector2;
+    geoRotation?: number;
 
 
 
@@ -43,6 +44,8 @@ export class GameMap {
                 partialBottomRight = { ...partialBottomRight, latitude: prop.value }
             } else if (prop.name == "endLon" && typeof prop.value == "number") {
                 partialBottomRight = { ...partialBottomRight, longitude: prop.value }
+            } else if (prop.name == "geoRotation" && typeof prop.value == "number") {
+                this.geoRotation = prop.value
             }
         }
 
